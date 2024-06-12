@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package dfs;
+
+service DfsService {
+    rpc Store (stream StoreRequest) returns (StoreResponse);
+    rpc Launch (LaunchRequest) returns (LaunchResponse);
+    rpc Heartbeat (HeartbeatRequest) returns (HeartbeatResponse);
+    rpc Replicate (stream ReplicateRequest) returns (ReplicateResponse);
+//    rpc MetadataUpdate (MetadataRequest) returns (MetadataResponse);
+//    rpc MetadataQuery (MetadataQueryRequest) returns (MetadataQueryResponse); 
+}
+
+message StoreRequest {
+    string instance_name = 1;
+    bytes instance_data = 2;
+}
+
+message StoreResponse {
+    bool success = 1;
+}
+
+message LaunchRequest {
+    string instance_name = 1;
+    string target_node = 2;
+}
+
+message LaunchResponse {
+    bool success = 1;
+}
+
+message HeartbeatRequest {
+    string node_id = 1;
+    int64 timestamp = 2;
+}
+
+message HeartbeatResponse {
+    bool success = 1;
+}
+
+message ReplicateRequest {
+    string instance_name = 1;
+    bytes instance_data = 2;
+}
+
+message ReplicateResponse {
+    bool success = 1;
+}
