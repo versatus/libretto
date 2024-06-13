@@ -54,7 +54,7 @@ pub async fn monitor_directory(
                     } else {
                         continue;
                     };
-                    let rel_path = rel_path.iter().skip(1).collect::<PathBuf>();
+                    let rel_path = rel_path.iter().skip(2).collect::<PathBuf>();
 
                     println!("RELPATH: {:?}", rel_path);
                     if SYSTEM_PATHS.iter().any(|sp| rel_path.starts_with(sp)) {
