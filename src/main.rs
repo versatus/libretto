@@ -38,5 +38,8 @@ async fn main() -> std::io::Result<()> {
     let _ = watcher.await?;
     */
 
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(60));
+    }
     Ok(())
 }
