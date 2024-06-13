@@ -6,16 +6,16 @@ use std::sync::Arc;
 
 pub async fn monitor_directory(path: &str, queue: Arc<RwLock<VecDeque<Event>>>) -> std::io::Result<()> {
     let inner_queue = queue.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+
     let mut watcher = notify::recommended_watcher(move |res| {
-        futures::executor::block_on(async {
+        let tx = tx.clone();
         match res {
             Ok(event) => {
-                let mut guard = inner_queue.write().await;
-                guard.push_back(event);
-                drop(guard);
+                let _ = tx.send(event);
             },
             Err(e) => println!("watch error: {:?}", e)
-        }})}).map_err(|e| {
+        }}).map_err(|e| {
             std::io::Error::new(
             std::io::ErrorKind::Other,
             e
@@ -28,6 +28,13 @@ pub async fn monitor_directory(path: &str, queue: Arc<RwLock<VecDeque<Event>>>) 
             e
         )
     })?;
+
+    tokio::spawn(async move {
+        while let Ok(event) = rx.recv() {
+            let mut guard = inner_queue.write().await;
+            guard.push_back(event);
+        }
+    });
 
     Ok(())
 }
