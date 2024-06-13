@@ -45,16 +45,22 @@ pub async fn monitor_directory(
             Ok(event) => {
                 let paths: Vec<PathBuf> = event.clone().paths.iter().map(|p| p.to_path_buf()).collect();
                 for path in &paths {
-                    if let Some(rel_path) = path.strip_prefix(&format!("{}/{}", inner_watch_path.clone(), "containers")).or_else(|_| {
-                        path.strip_prefix(&format!("{}/{}", inner_watch_path.clone(), "virtual-machines"))
-                    }).ok()
-                    .and_then(|p| p.iter().skip(1).collect::<PathBuf>().to_str().map(|s| s.to_string())) {
-                        if SYSTEM_PATHS.iter().any(|sp| rel_path.starts_with(sp)) {
-                            continue;
-                        } else {
-                            let _ = tx.send(event.clone());
-                        }
-                    }
+                    println!("PREFIX1: {}/containers", inner_watch_path.clone());
+                    println!("PREFIX2: {}/virtual-machines", inner_watch_path.clone());
+                    let rel_path = if let Ok(rel_path) = path.strip_prefix(&format!("{}/containers", inner_watch_path.clone())) {
+                        rel_path
+                    } else if let Ok(rel_path) = path.strip_prefix(&format!("{}/virtual_machine", inner_watch_path.clone())) {
+                        rel_path
+                    } else {
+                        continue;
+                    };
+                    let rel_path = rel_path.iter().skip(1).collect::<PathBuf>();
+
+                    println!("RELPATH: {:?}", rel_path);
+                    if SYSTEM_PATHS.iter().any(|sp| rel_path.starts_with(sp)) {
+                        continue;
+                    } 
+                    let _ = tx.send(event.clone());
                 }
             }
             Err(e) => println!("watch error: {:?}", e)
