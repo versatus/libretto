@@ -36,6 +36,7 @@ pub async fn monitor_directory(path: &str, queue: Arc<RwLock<VecDeque<Event>>>) 
             let mut guard = inner_queue.write().await;
             guard.push_back(event);
         }
+        println!("Channel closed");
     });
 
     println!("Directory watcher setup complete");
