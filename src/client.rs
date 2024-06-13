@@ -3,6 +3,9 @@ use std::{sync::Arc, collections::VecDeque, time::Duration};
 use notify::{Event, EventKind, event::{AccessKind, AccessMode, CreateKind, ModifyKind, RemoveKind, DataChange, RenameMode, MetadataKind}};
 use tokio::sync::RwLock;
 use serde::{Serialize, Deserialize};
+use tokio_stream::wrappers::ReceiverStream;
+
+use crate::dfs::{self, ReplicateRequest};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum VmmAction {
