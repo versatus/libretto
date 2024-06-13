@@ -7,7 +7,6 @@ use std::time::Duration;
 
 pub async fn monitor_directory(path: &str, queue: Arc<RwLock<VecDeque<Event>>>) -> std::io::Result<()> {
     println!("setting up directory watcher for path: {}", path);
-    let inner_queue = queue.clone();
     let (tx, rx) = std::sync::mpsc::channel();
 
     let mut watcher = notify::recommended_watcher(move |res| {
@@ -31,6 +30,7 @@ pub async fn monitor_directory(path: &str, queue: Arc<RwLock<VecDeque<Event>>>) 
         )
     })?;
 
+    let inner_queue = queue.clone();
     tokio::spawn(async move {
         loop {
             match rx.recv() {
@@ -38,6 +38,7 @@ pub async fn monitor_directory(path: &str, queue: Arc<RwLock<VecDeque<Event>>>) 
                     println!("Received event: {:?}", event);
                     let mut guard = inner_queue.write().await;
                     guard.push_back(event);
+                    drop(guard);
                 }
                 Err(e) => {
                     println!("Error: {e}")

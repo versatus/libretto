@@ -11,6 +11,7 @@ use tokio::sync::RwLock;
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
 
+    /*
     let mut watcher = notify::recommended_watcher(|res| {
         match res {
             Ok(event) => println!("event: {:?}", event),
@@ -19,8 +20,9 @@ async fn main() -> std::io::Result<()> {
     }).unwrap();
     
     watcher.watch(Path::new("/mnt/libretto"), RecursiveMode::Recursive).unwrap();
+    */
 
-    /*
+    
     let queue = Arc::new(
         RwLock::new(
             VecDeque::new()
@@ -36,10 +38,10 @@ async fn main() -> std::io::Result<()> {
     handle_events(queue.clone()).await;
 
     let _ = watcher.await?;
-    */
 
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(60));
     }
+
     Ok(())
 }
