@@ -55,9 +55,10 @@ pub async fn monitor_directory(
                         continue;
                     };
                     let rel_path = rel_path.iter().skip(2).collect::<PathBuf>();
+                    let rel_path_str = format!("/{}", rel_path.display());
 
-                    println!("RELPATH: {:?}", rel_path);
-                    if SYSTEM_PATHS.iter().any(|sp| rel_path.starts_with(sp)) {
+                    println!("RELPATH: {}", rel_path_str);
+                    if SYSTEM_PATHS.iter().any(|sp| rel_path_str.starts_with(sp)) {
                         continue;
                     } 
                     let _ = tx.send(event.clone());
