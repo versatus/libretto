@@ -3,6 +3,7 @@ use tokio::sync::RwLock;
 use std::collections::VecDeque;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 
 pub async fn monitor_directory(path: &str, queue: Arc<RwLock<VecDeque<Event>>>) -> std::io::Result<()> {
     println!("setting up directory watcher for path: {}", path);
@@ -31,15 +32,26 @@ pub async fn monitor_directory(path: &str, queue: Arc<RwLock<VecDeque<Event>>>) 
     })?;
 
     tokio::spawn(async move {
-        while let Ok(event) = rx.recv() {
-            println!("Received event: {:?}", event);
-            let mut guard = inner_queue.write().await;
-            guard.push_back(event);
+        loop {
+            match rx.recv() {
+                Ok(event) => {
+                    println!("Received event: {:?}", event);
+                    let mut guard = inner_queue.write().await;
+                    guard.push_back(event);
+                }
+                Err(e) => {
+                    println!("Error: {e}")
+                }
+            }
         }
         println!("Channel closed");
     });
 
     println!("Directory watcher setup complete");
+
+    loop {
+        std::thread::sleep(Duration::from_secs(60));
+    }
 
     Ok(())
 }
