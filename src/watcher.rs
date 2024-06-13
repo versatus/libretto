@@ -45,8 +45,6 @@ pub async fn monitor_directory(
             Ok(event) => {
                 let paths: Vec<PathBuf> = event.clone().paths.iter().map(|p| p.to_path_buf()).collect();
                 for path in &paths {
-                    println!("PREFIX1: {}/containers", inner_watch_path.clone());
-                    println!("PREFIX2: {}/virtual-machines", inner_watch_path.clone());
                     let rel_path = if let Ok(rel_path) = path.strip_prefix(&format!("{}/containers", inner_watch_path.clone())) {
                         rel_path
                     } else if let Ok(rel_path) = path.strip_prefix(&format!("{}/virtual_machine", inner_watch_path.clone())) {
@@ -57,7 +55,6 @@ pub async fn monitor_directory(
                     let rel_path = rel_path.iter().skip(2).collect::<PathBuf>();
                     let rel_path_str = format!("/{}", rel_path.display());
 
-                    println!("RELPATH: {}", rel_path_str);
                     if SYSTEM_PATHS.iter().any(|sp| rel_path_str.starts_with(sp)) {
                         continue;
                     } 
