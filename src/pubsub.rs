@@ -21,7 +21,9 @@ pub struct FilesystemSubscriber {
 
 impl FilesystemSubscriber {
     pub async fn new(uri: &str) -> std::io::Result<Self> {
-        let stream = TcpStream::connect(uri).await?;
+        let mut stream = TcpStream::connect(uri).await?;
+        let topics_str = FilesystemTopic.to_string();
+        stream.write_all(topics_str.as_bytes()).await?;
         Ok(Self { stream })
     }
 }
