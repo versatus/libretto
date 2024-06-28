@@ -1,46 +1,29 @@
-use std::collections::VecDeque;
-use std::path::Path;
-use std::sync::Arc;
-
-use libretto::client::handle_events;
+use libretto::client::LibrettoClient;
+use libretto::pubsub::FilesystemPublisher;
 use libretto::watcher;
-use notify::{RecursiveMode, Watcher};
-use tokio::sync::RwLock;
 
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    let libretto_client = LibrettoClient::new(
+        "127.0.0.1:5556",
+        "127.0.0.1:5555"
+    ).await?;
+    let event_handler = tokio::spawn(async move {
+        libretto_client.run().await?;
 
-    let (_stop_tx, stop_rx) = std::sync::mpsc::channel();
-    let queue = Arc::new(
-        RwLock::new(
-            VecDeque::new()
-        )
-    );
-
-    /*
-    let watcher_queue = queue.clone();
-    let watcher = tokio::spawn(
-        async move { 
-            watcher::monitor_directory("/mnt/libretto", watcher_queue.clone()).await
+        Ok::<(), std::io::Error>(())
     });
 
-    handle_events(queue.clone()).await;
-
-    let _ = watcher.await?;
-    */
-
-    let event_handling_queue = queue.clone();
-    tokio::spawn(async move {
-        handle_events(event_handling_queue.clone()).await;
+    let filesystem_publisher = FilesystemPublisher::new("127.0.0.1:5555").await?;
+    let monitor = tokio::spawn(async move {
+        let _ = watcher::monitor_directory(
+            "/home/ans/projects/sandbox/test-dir/",
+            filesystem_publisher
+        ).await;
     });
 
-    let _ = watcher::monitor_directory("/home/ans/projects/sandbox/test-dir/", queue, stop_rx).await;
-
-
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-    }
+    let _ = tokio::join!(monitor, event_handler);
 
     Ok(())
 }

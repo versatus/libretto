@@ -1,10 +1,9 @@
+use conductor::publisher::PubStream;
 use lazy_static::lazy_static;
 use notify::{Watcher, Event, RecursiveMode};
-use tokio::sync::RwLock;
-use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::Duration;
+
+use crate::pubsub::{FilesystemPublisher, FilesystemTopic};
 
 lazy_static! {
     static ref SYSTEM_PATHS: Vec<&'static str> = vec![
@@ -31,31 +30,48 @@ lazy_static! {
     ];
 }
 
+
 pub async fn monitor_directory(
     watch_path: &str,
-    queue: Arc<RwLock<VecDeque<Event>>>,
-    stop_recv: std::sync::mpsc::Receiver<()>
+    mut publisher: FilesystemPublisher,
 ) -> std::io::Result<()> {
-    let (tx, rx) = std::sync::mpsc::channel::<Event>();
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Event>(1024);
 
     let inner_watch_path = watch_path.to_string();
     let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
         let tx = tx.clone();
         match res {
             Ok(event) => {
-                let paths: Vec<PathBuf> = event.clone().paths.iter().map(|p| p.to_path_buf()).collect();
+                let paths: Vec<PathBuf> = event.clone()
+                    .paths.iter().map(|p| {
+                        p.to_path_buf()
+                    }).collect();
+
                 for path in &paths {
-                    let rel_path = if let Ok(rel_path) = path.strip_prefix(&format!("{}/containers", inner_watch_path.clone())) {
+                    let rel_path = if let Ok(rel_path) = path.strip_prefix(
+                        &format!(
+                            "{}/containers", inner_watch_path.clone()
+                        )
+                    ) {
                         rel_path
-                    } else if let Ok(rel_path) = path.strip_prefix(&format!("{}/virtual_machine", inner_watch_path.clone())) {
+                    } else if let Ok(rel_path) = path.strip_prefix(
+                        &format!(
+                            "{}/virtual_machine",
+                            inner_watch_path.clone()
+                        )
+                    ) {
                         rel_path
                     } else {
                         continue;
                     };
-                    let rel_path = rel_path.iter().skip(2).collect::<PathBuf>();
+                    let rel_path = rel_path.iter()
+                        .skip(2)
+                        .collect::<PathBuf>();
                     let rel_path_str = format!("/{}", rel_path.display());
 
-                    if SYSTEM_PATHS.iter().any(|sp| rel_path_str.starts_with(sp)) {
+                    if SYSTEM_PATHS.iter().any(|sp| {
+                        rel_path_str.starts_with(sp)
+                    }) {
                         continue;
                     } 
                     let _ = tx.send(event.clone());
@@ -66,33 +82,46 @@ pub async fn monitor_directory(
     }).unwrap();
 
 
-    watcher.watch(Path::new(&watch_path), RecursiveMode::Recursive).unwrap();
+    watcher.watch(
+        Path::new(
+            &watch_path
+        ), 
+        RecursiveMode::Recursive
+    ).unwrap();
 
-    let inner_queue = queue.clone();
-    tokio::spawn(async move {
-        loop {
-            match rx.recv() {
-                Ok(event) => {
-                    let mut guard = inner_queue.write().await;
-                    guard.push_back(event.clone());
-                    drop(guard);
-                }
-                Err(e) => {
-                    println!("Error: {e}");
-                    break
+    tokio::spawn(
+        async move {
+            loop {
+                tokio::select! {
+                    received = rx.recv() => {
+                        match received {
+                            Some(event) => {
+                                publisher.publish(
+                                    FilesystemTopic,
+                                    event
+                                ).await?;
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ = tokio::signal::ctrl_c() => {
+                        break;
+                    }
                 }
             }
+
+            Ok::<(), std::io::Error>(())
         }
-        println!("Channel closed");
-    });
+    );
 
 
 
     loop {
-        if let Ok(()) = stop_recv.recv() {
-            break
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {
+                break;
+            }
         }
-        std::thread::sleep(Duration::from_secs(60));
     }
 
     Ok(())
