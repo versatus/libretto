@@ -1000,6 +1000,7 @@ dependencies = [
  "dotenv",
  "futures",
  "lazy_static",
+ "log",
  "notify",
  "prost",
  "rayon",

@@ -77,7 +77,7 @@ pub async fn monitor_directory(
                     let _ = tx.send(event.clone());
                 }
             }
-            Err(e) => println!("watch error: {:?}", e)
+            Err(e) => log::error!("watch error: {:?}", e)
         }
     }).unwrap();
 
@@ -96,6 +96,7 @@ pub async fn monitor_directory(
                     received = rx.recv() => {
                         match received {
                             Some(event) => {
+                                log::info!("Filesystem Monitor received an event...");
                                 publisher.publish(
                                     FilesystemTopic,
                                     event
