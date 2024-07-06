@@ -48,7 +48,9 @@ pub async fn monitor_directory(
                         p.to_path_buf()
                     }).collect();
 
+                log::info!("Paths changed: {:?}", paths);
                 for path in &paths {
+                    log::info!("Paths changed: {:?}", paths);
                     let rel_path = if let Ok(rel_path) = path.strip_prefix(
                         &format!(
                             "{}/containers", inner_watch_path.clone()
@@ -65,17 +67,22 @@ pub async fn monitor_directory(
                     } else {
                         continue;
                     };
+
                     let rel_path = rel_path.iter()
                         .skip(2)
                         .collect::<PathBuf>();
 
                     let rel_path_str = format!("/{}", rel_path.display());
 
+                    log::info!("Change detected in rel_path: {}", &rel_path_str);
+
                     if SYSTEM_PATHS.iter().any(|sp| {
                         rel_path_str.starts_with(sp)
                     }) {
                         continue;
                     } 
+                    
+                    log::info!("Change detected in non-system path...");
 
                     let _ = tx.send(event.clone());
                 }
