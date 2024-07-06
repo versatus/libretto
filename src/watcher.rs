@@ -51,6 +51,7 @@ pub async fn monitor_directory(
                 log::info!("Paths changed: {:?}", paths);
                 for path in &paths {
                     log::info!("Paths changed: {:?}", paths);
+                    /*
                     let rel_path = if let Ok(rel_path) = path.strip_prefix(
                         &format!(
                             "{}/containers", inner_watch_path.clone()
@@ -67,8 +68,9 @@ pub async fn monitor_directory(
                     } else {
                         continue;
                     };
+                    */
 
-                    let rel_path = rel_path.iter()
+                    let rel_path = path.iter()
                         .skip(2)
                         .collect::<PathBuf>();
 
