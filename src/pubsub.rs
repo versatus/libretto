@@ -133,6 +133,7 @@ impl PubStream for FilesystemPublisher {
     type Message<'async_trait> = Event where Self: 'async_trait;
 
     async fn publish(&mut self, topic: Self::Topic, msg: Self::Message<'async_trait>) -> std::io::Result<()> {
+        log::info!("attempting to publish event to topic: {}", topic.to_string());
         let topic_len = topic.to_string().len();
         let topic_len_bytes = topic_len.to_be_bytes();
         let message_str = serde_json::to_string(&msg).map_err(|e| {
@@ -150,6 +151,7 @@ impl PubStream for FilesystemPublisher {
         full_message.extend_from_slice(&topic.to_string().as_bytes());
         full_message.extend_from_slice(message_str.as_bytes());
         self.stream.write_all(&full_message).await?;
+        log::info!("Succesfully wrote {} bytes to topic {}", message_len, topic.to_string());
         Ok(())
     }
 }
