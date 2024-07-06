@@ -42,6 +42,7 @@ pub async fn monitor_directory(
         let tx = tx.clone();
         match res {
             Ok(event) => {
+                log::info!("watcher discovered event: {:?}", event);
                 let paths: Vec<PathBuf> = event.clone()
                     .paths.iter().map(|p| {
                         p.to_path_buf()
@@ -56,7 +57,7 @@ pub async fn monitor_directory(
                         rel_path
                     } else if let Ok(rel_path) = path.strip_prefix(
                         &format!(
-                            "{}/virtual_machine",
+                            "{}/virtual-machine",
                             inner_watch_path.clone()
                         )
                     ) {
@@ -67,6 +68,7 @@ pub async fn monitor_directory(
                     let rel_path = rel_path.iter()
                         .skip(2)
                         .collect::<PathBuf>();
+
                     let rel_path_str = format!("/{}", rel_path.display());
 
                     if SYSTEM_PATHS.iter().any(|sp| {
@@ -74,6 +76,7 @@ pub async fn monitor_directory(
                     }) {
                         continue;
                     } 
+
                     let _ = tx.send(event.clone());
                 }
             }
@@ -91,6 +94,7 @@ pub async fn monitor_directory(
 
     tokio::spawn(
         async move {
+            let mut heartbeat_interval = tokio::time::interval(tokio::time::Duration::from_secs(20));
             loop {
                 tokio::select! {
                     received = rx.recv() => {
@@ -104,6 +108,9 @@ pub async fn monitor_directory(
                             }
                             _ => {}
                         }
+                    }
+                    _heartbeat = heartbeat_interval.tick() => {
+                        log::info!("Filesystem monitor still alive...");
                     }
                     _ = tokio::signal::ctrl_c() => {
                         break;
