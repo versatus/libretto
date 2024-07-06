@@ -1,7 +1,8 @@
 use conductor::publisher::PubStream;
 use lazy_static::lazy_static;
 use notify::{Watcher, Event, RecursiveMode};
-use std::path::{Path, PathBuf};
+use std::{collections::VecDeque, path::{Path, PathBuf}};
+use std::sync::{Arc, RwLock};
 
 use crate::pubsub::{FilesystemPublisher, FilesystemTopic};
 
@@ -35,11 +36,11 @@ pub async fn monitor_directory(
     watch_path: &str,
     mut publisher: FilesystemPublisher,
 ) -> std::io::Result<()> {
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<Event>(1024);
 
-    let inner_watch_path = watch_path.to_string();
+    let event_queue = Arc::new(RwLock::new(VecDeque::new()));
+    let watcher_queue = event_queue.clone();
     let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
-        let tx = tx.clone();
+        let inner_queue = watcher_queue.clone();
         match res {
             Ok(event) => {
                 log::info!("watcher discovered event: {:?}", event);
@@ -85,8 +86,11 @@ pub async fn monitor_directory(
                     } 
                     
                     log::info!("Change detected in non-system path...");
+                    if let Ok(mut guard) = inner_queue.write() {
+                        guard.push_back(event.clone());
+                        drop(guard);
+                    }
 
-                    let _ = tx.send(event.clone());
                 }
             }
             Err(e) => log::error!("watch error: {:?}", e)
@@ -101,23 +105,19 @@ pub async fn monitor_directory(
         RecursiveMode::Recursive
     ).unwrap();
 
+    let processor_queue = event_queue.clone();
     tokio::spawn(
         async move {
             let mut heartbeat_interval = tokio::time::interval(tokio::time::Duration::from_secs(20));
             loop {
                 tokio::select! {
-                    received = rx.recv() => {
-                        match received {
-                            Some(event) => {
-                                log::info!("Filesystem Monitor received an event...");
-                                publisher.publish(
-                                    FilesystemTopic,
-                                    event
-                                ).await?;
-                            }
-                            _ => {}
-                        }
-                    }
+                    Ok(event) = process_queue(processor_queue.clone()) => {
+                        publisher.publish(
+                            FilesystemTopic,
+                            event
+                        ).await?;
+                        log::info!("Succesfully published event...");
+                    },
                     _heartbeat = heartbeat_interval.tick() => {
                         log::info!("Filesystem monitor still alive...");
                     }
@@ -142,4 +142,32 @@ pub async fn monitor_directory(
     }
 
     Ok(())
+}
+
+async fn process_queue(
+    shared_queue: Arc<RwLock<VecDeque<Event>>>,
+) -> std::io::Result<Event> {
+    let res = shared_queue.write();
+    let return_res = match res {
+        Ok(mut guard) => {
+            let event_res = guard.pop_front().ok_or(
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Queue currently empty"
+                )
+            );
+            drop(guard);
+            event_res
+        }
+        Err(e) => {
+            Err(
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("unable to acquire lock on shared queue: {e}")
+                )
+            )
+        }
+    };
+
+    return_res
 }
